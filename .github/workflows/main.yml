@@ -42,9 +42,45 @@ jobs:
       - name: Run MLflow project
         run: mlflow run MLproject --env-manager=local
 
-      # Upload mlruns as artifact
-      - name: Upload mlruns as artifact
+      # Find latest run folder
+      - name: Find latest run
+        id: latest_run
+        run: |
+          LATEST_RUN=$(ls -td MLproject/mlruns/*/*/ | head -1)
+          echo "LATEST_RUN=$LATEST_RUN" >> $GITHUB_ENV
+
+      # Create summary markdown from metrics and params
+      - name: Generate summary
+        run: |
+          SUMMARY_FILE=${{ env.LATEST_RUN }}/summary.md
+          echo "# MLflow Run Summary" > $SUMMARY_FILE
+          echo "" >> $SUMMARY_FILE
+
+          echo "## Parameters" >> $SUMMARY_FILE
+          if [ -f "${{ env.LATEST_RUN }}/params.json" ]; then
+            cat "${{ env.LATEST_RUN }}/params.json" | jq -r 'to_entries | map("| \(.key) | \(.value) |") | .[]' >> $SUMMARY_FILE
+          else
+            echo "_No params found_" >> $SUMMARY_FILE
+          fi
+          echo "" >> $SUMMARY_FILE
+
+          echo "## Metrics" >> $SUMMARY_FILE
+          if [ -f "${{ env.LATEST_RUN }}/metrics.json" ]; then
+            cat "${{ env.LATEST_RUN }}/metrics.json" | jq -r 'to_entries | map("| \(.key) | \(.value) |") | .[]' >> $SUMMARY_FILE
+          else
+            echo "_No metrics found_" >> $SUMMARY_FILE
+          fi
+
+      # Upload only the latest run folder
+      - name: Upload latest run artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mlruns
-          path: MLproject/mlruns/
+          name: latest-mlflow-run
+          path: ${{ env.LATEST_RUN }}
+
+      # Upload summary markdown separately for quick view
+      - name: Upload summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-summary
+          path: ${{ env.LATEST_RUN }}/summary.md
