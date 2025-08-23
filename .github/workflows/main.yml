@@ -14,73 +14,54 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout source code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Setup Python
       - name: Set up Python 3.12.7
         uses: actions/setup-python@v4
         with:
           python-version: "3.12.7"
 
-      # Show environment variables
       - name: Check Env
         run: echo "CSV_URL=$CSV_URL"
 
-      # Install dependencies (mlflow only, conda.yaml will handle the rest)
-      - name: Install MLflow
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install mlflow
 
-      # Clean mlruns before run
-      - name: Clean mlruns
-        run: rm -rf MLproject/mlruns
+      - name: Clean old mlruns
+        run: rm -rf mlruns
 
-      # Run MLflow project (point to folder MLproject/)
       - name: Run MLflow project
         run: mlflow run MLproject --env-manager=local
 
-      # Find latest run folder
-      - name: Find latest run
+      - name: Collect latest run ID
         id: latest_run
         run: |
-          LATEST_RUN=$(ls -td MLproject/mlruns/*/*/ | head -1)
+          LATEST_RUN=$(ls -td mlruns/*/*/ | head -1)
           echo "LATEST_RUN=$LATEST_RUN" >> $GITHUB_ENV
 
-      # Create summary markdown from metrics and params
-      - name: Generate summary
+      - name: Generate summary markdown
         run: |
-          SUMMARY_FILE=${{ env.LATEST_RUN }}/summary.md
+          SUMMARY_FILE=summary.md
           echo "# MLflow Run Summary" > $SUMMARY_FILE
           echo "" >> $SUMMARY_FILE
-
           echo "## Parameters" >> $SUMMARY_FILE
-          if [ -f "${{ env.LATEST_RUN }}/params.json" ]; then
-            cat "${{ env.LATEST_RUN }}/params.json" | jq -r 'to_entries | map("| \(.key) | \(.value) |") | .[]' >> $SUMMARY_FILE
-          else
-            echo "_No params found_" >> $SUMMARY_FILE
-          fi
+          cat $LATEST_RUN/params/* 2>/dev/null | sed 's/^/- /' >> $SUMMARY_FILE || echo "_No params found_" >> $SUMMARY_FILE
           echo "" >> $SUMMARY_FILE
-
           echo "## Metrics" >> $SUMMARY_FILE
-          if [ -f "${{ env.LATEST_RUN }}/metrics.json" ]; then
-            cat "${{ env.LATEST_RUN }}/metrics.json" | jq -r 'to_entries | map("| \(.key) | \(.value) |") | .[]' >> $SUMMARY_FILE
-          else
-            echo "_No metrics found_" >> $SUMMARY_FILE
-          fi
+          cat $LATEST_RUN/metrics/* 2>/dev/null | sed 's/^/- /' >> $SUMMARY_FILE || echo "_No metrics found_" >> $SUMMARY_FILE
 
-      # Upload only the latest run folder
-      - name: Upload latest run artifact
+      - name: Upload mlruns as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: latest-mlflow-run
-          path: ${{ env.LATEST_RUN }}
+          name: mlruns
+          path: mlruns/
 
-      # Upload summary markdown separately for quick view
-      - name: Upload summary artifact
+      - name: Upload summary as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mlflow-summary
-          path: ${{ env.LATEST_RUN }}/summary.md
+          name: run-summary
+          path: summary.md
+          
