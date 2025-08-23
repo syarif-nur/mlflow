@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  CSV_URL: "MLproject/train_pca.csv"
+  CSV_URL: "train_pca.csv"
 
 jobs:
   build:
@@ -34,13 +34,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install mlflow
 
-      # Run MLflow project (from current directory)
+      # Run MLflow project (point to folder MLproject/)
       - name: Run MLflow project
-        run: mlflow run . --env-manager=local
+        run: mlflow run MLproject --env-manager=local
 
-      # Upload mlruns as artifact (instead of pushing to repo)
+      # Upload mlruns as artifact
       - name: Upload mlruns as artifact
         uses: actions/upload-artifact@v4
         with:
           name: mlruns
-          path: mlruns/
+          path: MLproject/mlruns/
