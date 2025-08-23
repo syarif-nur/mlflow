@@ -2,44 +2,49 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
+
+env:
+  CSV_URL: "train_pca.csv"
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout repository
-      - uses: actions/checkout@v3
+      # Checkout source code
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       # Setup Python
-      - name: Set up Python
+      - name: Set up Python 3.12.7
         uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: "3.12.7"
 
-      # Install dependencies
-      - name: Install dependencies
+      # Show environment variables
+      - name: Check Env
+        run: echo "CSV_URL=$CSV_URL"
+
+      # Install dependencies (mlflow only, conda.yaml will handle the rest)
+      - name: Install MLflow
         run: |
-          pip install --upgrade pip
-          pip install -r MLproject/requirements.txt
+          python -m pip install --upgrade pip
           pip install mlflow
 
       # Clean mlruns before run
       - name: Clean mlruns
         run: rm -rf MLproject/mlruns
 
-      # Run MLflow project
+      # Run MLflow project (point to folder MLproject/)
       - name: Run MLflow project
         run: mlflow run MLproject --env-manager=local
 
-      # Upload trained model as artifact
-      - name: Upload MLflow artifacts
+      # Upload mlruns as artifact
+      - name: Upload mlruns as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mlflow-artifacts
-          path: MLproject/mlruns
+          name: mlruns
+          path: MLproject/mlruns/
